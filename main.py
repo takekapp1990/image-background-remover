@@ -224,6 +224,7 @@ def main():
     validate_input(input_dir)
 
     # 出力ディレクトリの処理
+    has_gitkeep = False  # 初期化を追加
     if os.path.exists(output_dir):
         # .gitkeepファイルを一時的に保存
         gitkeep_path = os.path.join(output_dir, '.gitkeep')
