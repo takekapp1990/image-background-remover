@@ -2,10 +2,13 @@
 画像の背景を削除し、前景を中央に配置してリサイズするツール
 
 使用方法:
-    python main.py <prefix>
+    python main.py <prefix> [--input-dir INPUT_DIR] [--output-dir OUTPUT_DIR] [--mode {rembg,white}]
 
 引数:
     prefix: 出力ファイル名のプレフィックス
+    --input-dir: 入力ディレクトリのパス（オプション）
+    --output-dir: 出力ディレクトリのパス（オプション）
+    --mode: 背景削除モード（rembg または white）（オプション）
 
 機能:
     - 画像の背景を自動で削除
@@ -21,9 +24,26 @@ import sys
 import re
 import io
 import shutil
+import numpy as np
+import argparse
+
+# デフォルト設定
+DEFAULT_INPUT_DIR = "input"  # 入力画像を配置するディレクトリ
+DEFAULT_OUTPUT_DIR = "output"  # 処理済み画像を保存するディレクトリ
+DEFAULT_BACKGROUND_REMOVAL_MODE = "rembg"  # 背景削除モード
 
 # 背景削除の設定
 DEFAULT_MARGIN_RATIO = 0.1  # 10%余白（前景を90%にスケーリング）
+
+# 背景削除モードの設定
+BACKGROUND_REMOVAL_MODE = "rembg"  # "rembg" または "white"
+# rembg: AIによる背景削除（デフォルト）
+# white: 白い背景を透過
+
+# 白背景透過の設定
+WHITE_THRESHOLD = 240  # 白と判断する閾値（0-255）
+# 値が大きいほど白として認識されやすくなる
+# 240: ほぼ白に近い部分を背景として認識
 
 # rembgの背景削除パラメータ
 ALPHA_MATTING = False  # アルファマット処理の有効/無効
@@ -48,21 +68,32 @@ POST_PROCESS_MASK = True  # 後処理マスクの有効/無効
 # True: エッジの処理を改善し、より自然な境界を作成（デフォルト）
 # False: 後処理を行わない（処理が速くなるが、境界が粗くなる可能性がある）
 
-def validate_input():
-    """コマンドライン引数の検証"""
-    if len(sys.argv) != 2:
-        print("エラー: 引数が不正です")
-        print("使用方法: python main.py <prefix>")
-        print("例: python main.py product")
+def parse_arguments():
+    """コマンドライン引数の解析"""
+    parser = argparse.ArgumentParser(description='画像の背景を削除し、前景を中央に配置するツール')
+    parser.add_argument('prefix', help='出力ファイル名のプレフィックス')
+    parser.add_argument('--input-dir', help='入力ディレクトリのパス')
+    parser.add_argument('--output-dir', help='出力ディレクトリのパス')
+    parser.add_argument('--mode', choices=['rembg', 'white'], help='背景削除モード（rembg または white）')
+    
+    args = parser.parse_args()
+    
+    # デフォルト値の設定
+    input_dir = args.input_dir if args.input_dir else DEFAULT_INPUT_DIR
+    output_dir = args.output_dir if args.output_dir else DEFAULT_OUTPUT_DIR
+    mode = args.mode if args.mode else DEFAULT_BACKGROUND_REMOVAL_MODE
+    
+    return args.prefix, input_dir, output_dir, mode
+
+def validate_input(input_dir):
+    """入力ディレクトリの検証"""
+    if not os.path.exists(input_dir):
+        print(f"エラー: '{input_dir}'ディレクトリが見つかりません")
+        print(f"'{input_dir}'ディレクトリを作成し、処理したい画像を配置してください")
         sys.exit(1)
 
-    if not os.path.exists('input'):
-        print("エラー: 'input'ディレクトリが見つかりません")
-        print("'input'ディレクトリを作成し、処理したい画像を配置してください")
-        sys.exit(1)
-
-    if not any(f.lower().endswith(('.png', '.jpg', '.jpeg')) for f in os.listdir('input')):
-        print("エラー: 'input'ディレクトリに画像ファイルが見つかりません")
+    if not any(f.lower().endswith(('.png', '.jpg', '.jpeg')) for f in os.listdir(input_dir)):
+        print(f"エラー: '{input_dir}'ディレクトリに画像ファイルが見つかりません")
         print("対応形式: .png, .jpg, .jpeg")
         sys.exit(1)
 
@@ -136,14 +167,63 @@ def scale_foreground(image: Image.Image, margin_ratio=DEFAULT_MARGIN_RATIO):
 
     return canvas
 
+def remove_white_background(image: Image.Image):
+    """
+    白い背景を透過する
+    
+    Args:
+        image: PIL Imageオブジェクト
+        
+    Returns:
+        背景が透過された画像
+    """
+    # 画像をRGBAモードに変換
+    image = image.convert("RGBA")
+    data = np.array(image)
+    
+    # RGBの各チャンネルが閾値以上の場合を白と判断
+    white_mask = np.all(data[:, :, :3] >= WHITE_THRESHOLD, axis=2)
+    
+    # 白い部分を透過
+    data[:, :, 3] = np.where(white_mask, 0, 255)
+    
+    return Image.fromarray(data)
+
+def process_image(input_data: bytes, mode: str) -> bytes:
+    """
+    画像を処理して背景を削除する
+    
+    Args:
+        input_data: 入力画像のバイトデータ
+        mode: 背景削除モード
+        
+    Returns:
+        処理済み画像のバイトデータ
+    """
+    if mode == "white":
+        # 白背景透過モード
+        image = Image.open(io.BytesIO(input_data))
+        processed_image = remove_white_background(image)
+        output = io.BytesIO()
+        processed_image.save(output, format="PNG")
+        return output.getvalue()
+    else:
+        # rembgモード
+        return remove(
+            input_data,
+            alpha_matting=ALPHA_MATTING,
+            alpha_matting_foreground_threshold=ALPHA_MATTING_FOREGROUND_THRESHOLD,
+            alpha_matting_background_threshold=ALPHA_MATTING_BACKGROUND_THRESHOLD,
+            alpha_matting_erode_size=ALPHA_MATTING_ERODE_SIZE,
+            post_process_mask=POST_PROCESS_MASK
+        )
+
 def main():
     """メイン処理"""
-    validate_input()
-    prefix = sys.argv[1]
+    prefix, input_dir, output_dir, mode = parse_arguments()
+    validate_input(input_dir)
 
-    input_dir = 'input'
-    output_dir = 'output'
-
+    # 出力ディレクトリの処理
     if os.path.exists(output_dir):
         # .gitkeepファイルを一時的に保存
         gitkeep_path = os.path.join(output_dir, '.gitkeep')
@@ -177,14 +257,7 @@ def main():
 
                 with open(input_path, 'rb') as i:
                     input_data = i.read()
-                    output_data = remove(
-                        input_data,
-                        alpha_matting=ALPHA_MATTING,
-                        alpha_matting_foreground_threshold=ALPHA_MATTING_FOREGROUND_THRESHOLD,
-                        alpha_matting_background_threshold=ALPHA_MATTING_BACKGROUND_THRESHOLD,
-                        alpha_matting_erode_size=ALPHA_MATTING_ERODE_SIZE,
-                        post_process_mask=POST_PROCESS_MASK
-                    )
+                    output_data = process_image(input_data, mode)
 
                     image = Image.open(io.BytesIO(output_data)).convert("RGBA")
                     centered_scaled = scale_foreground(image)
@@ -203,6 +276,7 @@ def main():
     else:
         print(f"\n処理完了: {processed_count}個の画像を処理しました")
         print(f"出力先: {os.path.abspath(output_dir)}")
+        print(f"使用モード: {mode}")
 
 if __name__ == "__main__":
     main()
