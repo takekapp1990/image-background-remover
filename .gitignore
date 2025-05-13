@@ -1,0 +1,46 @@
+# 入力画像ファイル
+input/*
+!input/.gitkeep
+
+# 出力画像ファイル
+output/*
+!output/.gitkeep
+
+# Python関連
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 環境設定ファイル
+.env
+.venv
+venv/
+ENV/
+
+# IDE関連
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS関連
+.DS_Store
+**/.DS_Store 
