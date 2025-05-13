@@ -22,7 +22,31 @@ import re
 import io
 import shutil
 
+# 背景削除の設定
 DEFAULT_MARGIN_RATIO = 0.1  # 10%余白（前景を90%にスケーリング）
+
+# rembgの背景削除パラメータ
+ALPHA_MATTING = False  # アルファマット処理の有効/無効
+# True: 半透明な部分（髪の毛など）の処理が改善されるが、処理時間が長くなる
+# False: 通常の背景削除処理（デフォルト）
+
+ALPHA_MATTING_FOREGROUND_THRESHOLD = 240  # 前景と判断する閾値（0-255）
+# 値が大きいほど前景として認識されやすくなる
+# 240: ほぼ白に近い部分を前景として認識（デフォルト）
+
+ALPHA_MATTING_BACKGROUND_THRESHOLD = 10  # 背景と判断する閾値（0-255）
+# 値が小さいほど背景として認識されやすくなる
+# 10: ほぼ黒に近い部分を背景として認識（デフォルト）
+
+ALPHA_MATTING_ERODE_SIZE = 10  # エロード処理のサイズ
+# 値が大きいほど境界が滑らかになる
+# 10: 中程度の滑らかさ（デフォルト）
+# 0: エロード処理なし
+# 20以上: より滑らかな境界
+
+POST_PROCESS_MASK = True  # 後処理マスクの有効/無効
+# True: エッジの処理を改善し、より自然な境界を作成（デフォルト）
+# False: 後処理を行わない（処理が速くなるが、境界が粗くなる可能性がある）
 
 def validate_input():
     """コマンドライン引数の検証"""
@@ -121,8 +145,23 @@ def main():
     output_dir = 'output'
 
     if os.path.exists(output_dir):
+        # .gitkeepファイルを一時的に保存
+        gitkeep_path = os.path.join(output_dir, '.gitkeep')
+        has_gitkeep = os.path.exists(gitkeep_path)
+        if has_gitkeep:
+            with open(gitkeep_path, 'rb') as f:
+                gitkeep_content = f.read()
+        
+        # 出力ディレクトリを削除
         shutil.rmtree(output_dir)
+    
+    # 出力ディレクトリを作成
     os.makedirs(output_dir, exist_ok=True)
+    
+    # .gitkeepファイルを復元
+    if has_gitkeep:
+        with open(gitkeep_path, 'wb') as f:
+            f.write(gitkeep_content)
 
     counter = 1
     processed_count = 0
@@ -138,7 +177,14 @@ def main():
 
                 with open(input_path, 'rb') as i:
                     input_data = i.read()
-                    output_data = remove(input_data)
+                    output_data = remove(
+                        input_data,
+                        alpha_matting=ALPHA_MATTING,
+                        alpha_matting_foreground_threshold=ALPHA_MATTING_FOREGROUND_THRESHOLD,
+                        alpha_matting_background_threshold=ALPHA_MATTING_BACKGROUND_THRESHOLD,
+                        alpha_matting_erode_size=ALPHA_MATTING_ERODE_SIZE,
+                        post_process_mask=POST_PROCESS_MASK
+                    )
 
                     image = Image.open(io.BytesIO(output_data)).convert("RGBA")
                     centered_scaled = scale_foreground(image)
