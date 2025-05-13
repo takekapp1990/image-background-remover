@@ -42,12 +42,15 @@ pip install -r requirements.txt
 
 2. 以下のコマンドを実行:
 ```bash
-python main.py <prefix> [--input-dir INPUT_DIR] [--output-dir OUTPUT_DIR] [--mode {rembg,white}]
+python main.py [prefix] [--input-dir INPUT_DIR] [--output-dir OUTPUT_DIR] [--mode {rembg,white}]
 ```
 
 例:
 ```bash
-# デフォルト設定で実行
+# デフォルト設定で実行（プレフィックスなし）
+python main.py
+
+# プレフィックスを指定して実行
 python main.py product
 
 # カスタム設定で実行
@@ -56,7 +59,10 @@ python main.py product --input-dir my_images --output-dir results --mode white
 
 ### 引数
 
-- `prefix`: 出力ファイル名のプレフィックス（必須）
+- `prefix`: 出力ファイル名のプレフィックス（オプション）
+  - 省略可能（デフォルト: なし）
+  - 指定した場合: `<prefix>_<number>_<original_name>.png`
+  - 省略した場合: `<original_name>.png`
 - `--input-dir`: 入力ディレクトリのパス（オプション）
 - `--output-dir`: 出力ディレクトリのパス（オプション）
 - `--mode`: 背景削除モード（rembg または white）（オプション）
@@ -68,6 +74,7 @@ python main.py product --input-dir my_images --output-dir results --mode white
 - 入力ディレクトリ: `"input"`
 - 出力ディレクトリ: `"output"`
 - 背景削除モード: `"rembg"`
+- プレフィックス: `""`（なし）
 
 ### 背景削除モード
 

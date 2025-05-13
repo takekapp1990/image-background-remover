@@ -31,6 +31,7 @@ import argparse
 DEFAULT_INPUT_DIR = "input"  # 入力画像を配置するディレクトリ
 DEFAULT_OUTPUT_DIR = "output"  # 処理済み画像を保存するディレクトリ
 DEFAULT_BACKGROUND_REMOVAL_MODE = "rembg"  # 背景削除モード
+DEFAULT_PREFIX = ""  # デフォルトのプレフィックス（空文字）
 
 # 背景削除の設定
 DEFAULT_MARGIN_RATIO = 0.1  # 10%余白（前景を90%にスケーリング）
@@ -71,7 +72,7 @@ POST_PROCESS_MASK = True  # 後処理マスクの有効/無効
 def parse_arguments():
     """コマンドライン引数の解析"""
     parser = argparse.ArgumentParser(description='画像の背景を削除し、前景を中央に配置するツール')
-    parser.add_argument('prefix', help='出力ファイル名のプレフィックス')
+    parser.add_argument('prefix', nargs='?', default=DEFAULT_PREFIX, help='出力ファイル名のプレフィックス（省略可）')
     parser.add_argument('--input-dir', help='入力ディレクトリのパス')
     parser.add_argument('--output-dir', help='出力ディレクトリのパス')
     parser.add_argument('--mode', choices=['rembg', 'white'], help='背景削除モード（rembg または white）')
@@ -82,8 +83,9 @@ def parse_arguments():
     input_dir = args.input_dir if args.input_dir else DEFAULT_INPUT_DIR
     output_dir = args.output_dir if args.output_dir else DEFAULT_OUTPUT_DIR
     mode = args.mode if args.mode else DEFAULT_BACKGROUND_REMOVAL_MODE
+    prefix = args.prefix if args.prefix else DEFAULT_PREFIX
     
-    return args.prefix, input_dir, output_dir, mode
+    return prefix, input_dir, output_dir, mode
 
 def validate_input(input_dir):
     """入力ディレクトリの検証"""
@@ -221,10 +223,19 @@ def process_image(input_data: bytes, mode: str) -> bytes:
 def main():
     """メイン処理"""
     prefix, input_dir, output_dir, mode = parse_arguments()
+    
+    # 設定値の出力
+    print("\n=== 設定 ====")
+    print(f"入力ディレクトリ: {input_dir}")
+    print(f"出力ディレクトリ: {output_dir}")
+    print(f"背景削除モード: {mode}")
+    print(f"プレフィックス: {prefix if prefix else '(なし)'}")
+    print("=============\n")
+    
     validate_input(input_dir)
 
     # 出力ディレクトリの処理
-    has_gitkeep = False  # 初期化を追加
+    has_gitkeep = False
     if os.path.exists(output_dir):
         # .gitkeepファイルを一時的に保存
         gitkeep_path = os.path.join(output_dir, '.gitkeep')
@@ -253,7 +264,11 @@ def main():
                 input_path = os.path.join(input_dir, filename)
 
                 base_name = sanitize_filename(filename)
-                output_name = f"{prefix}_{counter}_{base_name}.png"
+                # プレフィックスが空の場合は元のファイル名をそのまま使用
+                if prefix:
+                    output_name = f"{prefix}_{counter}_{base_name}.png"
+                else:
+                    output_name = f"{base_name}.png"
                 output_path = os.path.join(output_dir, output_name)
 
                 with open(input_path, 'rb') as i:
