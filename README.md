@@ -1,12 +1,12 @@
 # 画像背景削除ツール
 
-画像の背景を自動で削除し、前景を中央に配置してリサイズするPythonツールです。
+このツールは、画像の背景を自動で削除し、前景を中央に配置してリサイズするPythonスクリプトです。
 
 ## 機能
 
 - 画像の背景を自動で削除
   - AIによる背景削除（rembg）
-  - 白背景透過モード
+  - 画像の端から背景色を自動検出して削除（auto）
 - 前景を中央に配置
 - 前景を適切なサイズにリサイズ（デフォルトで90%）
 - ファイル名の正規化（英数字のみ、スペースをアンダースコアに変換）
@@ -15,7 +15,7 @@
 
 ## 必要条件
 
-- Python 3.7以上
+- Python 3.8以上
 - 以下のPythonパッケージ:
   - rembg
   - Pillow (PIL)
@@ -23,7 +23,7 @@
 
 ## インストール
 
-1. リポジトリをクローン:
+1. リポジトリをクローンまたはダウンロード:
 ```bash
 git clone https://github.com/yourusername/image_rembg.git
 cd image_rembg
@@ -36,25 +36,32 @@ pip install -r requirements.txt
 
 ## 使用方法
 
-1. 入力ディレクトリを作成し、処理したい画像を配置します
-   - デフォルトでは`input`ディレクトリを使用
-   - `--input-dir`オプションで変更可能
-
-2. 以下のコマンドを実行:
+1. 入力画像を`input`ディレクトリに配置
+2. スクリプトを実行:
 ```bash
-python main.py [prefix] [--input-dir INPUT_DIR] [--output-dir OUTPUT_DIR] [--mode {rembg,white}]
+python main.py [プレフィックス] [オプション]
 ```
 
-例:
+### オプション
+
+- `--input-dir`: 入力ディレクトリのパス（デフォルト: `input`）
+- `--output-dir`: 出力ディレクトリのパス（デフォルト: `output`）
+- `--mode`: 背景削除モード
+  - `rembg`: AIによる背景削除
+  - `auto`: 画像の端から背景色を自動検出して削除（デフォルト）
+
+### 例
+
 ```bash
-# デフォルト設定で実行（プレフィックスなし）
+# デフォルト設定で実行
 python main.py
 
-# プレフィックスを指定して実行
-python main.py product
+# カスタムプレフィックスと入力/出力ディレクトリを指定
+python main.py my_prefix --input-dir custom_input --output-dir custom_output
 
-# カスタム設定で実行
-python main.py product --input-dir my_images --output-dir results --mode white
+# 背景削除モードを指定
+python main.py --mode rembg  # AIによる背景削除
+python main.py --mode auto   # 背景色自動検出
 ```
 
 ### 引数
@@ -63,9 +70,6 @@ python main.py product --input-dir my_images --output-dir results --mode white
   - 省略可能（デフォルト: なし）
   - 指定した場合: `<prefix>_<number>_<original_name>.png`
   - 省略した場合: `<original_name>.png`
-- `--input-dir`: 入力ディレクトリのパス（オプション）
-- `--output-dir`: 出力ディレクトリのパス（オプション）
-- `--mode`: 背景削除モード（rembg または white）（オプション）
 
 ### デフォルト設定
 
@@ -84,14 +88,13 @@ python main.py product --input-dir my_images --output-dir results --mode white
    - 複雑な背景でも高精度に前景を抽出
    - 髪の毛などの半透明な部分も適切に処理
 
-2. 白背景透過モード
-   - 白い背景を持つ画像に最適化
-   - 高速な処理が可能
-   - 白と判断する閾値を調整可能（デフォルト: 240）
+2. 画像の端から背景色を自動検出して削除
+   - 背景色と判断する色の差の閾値を調整可能（デフォルト: 240）
+   - 端からのサンプリング範囲を調整可能（デフォルト: 100）
 
 モードの切り替えは`main.py`内の`BACKGROUND_REMOVAL_MODE`定数で設定：
 - `"rembg"`: AIによる背景削除（デフォルト）
-- `"white"`: 白背景透過
+- `"auto"`: 画像の端から背景色を自動検出して削除
 
 ### 対応画像形式
 
@@ -100,8 +103,9 @@ python main.py product --input-dir my_images --output-dir results --mode white
 
 ## 出力
 
-- 処理された画像は`output`ディレクトリに保存されます
-- 出力ファイル名の形式: `<prefix>_<number>_<original_name>.png`
+処理済みの画像は`output`ディレクトリ（または指定した出力ディレクトリ）に保存されます。
+ファイル名は以下の形式で生成されます：
+`[プレフィックス]_[元のファイル名（正規化済み）].png`
 
 ## エラーメッセージ
 

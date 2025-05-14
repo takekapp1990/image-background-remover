@@ -2,13 +2,13 @@
 画像の背景を削除し、前景を中央に配置してリサイズするツール
 
 使用方法:
-    python main.py <prefix> [--input-dir INPUT_DIR] [--output-dir OUTPUT_DIR] [--mode {rembg,white}]
+    python main.py <prefix> [--input-dir INPUT_DIR] [--output-dir OUTPUT_DIR] [--mode {rembg,auto}]
 
 引数:
     prefix: 出力ファイル名のプレフィックス
     --input-dir: 入力ディレクトリのパス（オプション）
     --output-dir: 出力ディレクトリのパス（オプション）
-    --mode: 背景削除モード（rembg または white）（オプション）
+    --mode: 背景削除モード（rembg または auto）（オプション）
 
 機能:
     - 画像の背景を自動で削除
@@ -30,16 +30,20 @@ import argparse
 # デフォルト設定
 DEFAULT_INPUT_DIR = "input"  # 入力画像を配置するディレクトリ
 DEFAULT_OUTPUT_DIR = "output"  # 処理済み画像を保存するディレクトリ
-DEFAULT_BACKGROUND_REMOVAL_MODE = "rembg"  # 背景削除モード
+DEFAULT_BACKGROUND_REMOVAL_MODE = "auto"  # 背景削除モード
 DEFAULT_PREFIX = ""  # デフォルトのプレフィックス（空文字）
 
 # 背景削除の設定
 DEFAULT_MARGIN_RATIO = 0.1  # 10%余白（前景を90%にスケーリング）
 
 # 背景削除モードの設定
-BACKGROUND_REMOVAL_MODE = "rembg"  # "rembg" または "white"
-# rembg: AIによる背景削除（デフォルト）
-# white: 白い背景を透過
+BACKGROUND_REMOVAL_MODE = "auto"  # "rembg" または "auto"
+# rembg: AIによる背景削除
+# auto: 画像の端から背景色を検出して削除
+
+# 背景色検出の設定
+EDGE_SAMPLE_SIZE = 5  # 端から何ピクセル分をサンプリングするか
+COLOR_THRESHOLD = 30  # 背景色と判断する色の差の閾値
 
 # 白背景透過の設定
 WHITE_THRESHOLD = 240  # 白と判断する閾値（0-255）
@@ -75,7 +79,7 @@ def parse_arguments():
     parser.add_argument('prefix', nargs='?', default=DEFAULT_PREFIX, help='出力ファイル名のプレフィックス（省略可）')
     parser.add_argument('--input-dir', help='入力ディレクトリのパス')
     parser.add_argument('--output-dir', help='出力ディレクトリのパス')
-    parser.add_argument('--mode', choices=['rembg', 'white'], help='背景削除モード（rembg または white）')
+    parser.add_argument('--mode', choices=['rembg', 'auto'], help='背景削除モード（rembg または auto）')
     
     args = parser.parse_args()
     
@@ -191,6 +195,65 @@ def remove_white_background(image: Image.Image):
     
     return Image.fromarray(data)
 
+def detect_background_color(image: Image.Image) -> tuple:
+    """
+    画像の端から背景色を検出する
+    
+    Args:
+        image: PIL Imageオブジェクト
+        
+    Returns:
+        検出された背景色 (R, G, B)
+    """
+    width, height = image.size
+    edge_pixels = []
+    
+    # 画像の端からピクセルをサンプリング
+    for x in range(EDGE_SAMPLE_SIZE):
+        for y in range(height):
+            edge_pixels.append(image.getpixel((x, y)))  # 左端
+            edge_pixels.append(image.getpixel((width - 1 - x, y)))  # 右端
+    
+    for y in range(EDGE_SAMPLE_SIZE):
+        for x in range(width):
+            edge_pixels.append(image.getpixel((x, y)))  # 上端
+            edge_pixels.append(image.getpixel((x, height - 1 - y)))  # 下端
+    
+    # 最も頻出する色を背景色として検出
+    color_counts = {}
+    for pixel in edge_pixels:
+        if pixel in color_counts:
+            color_counts[pixel] += 1
+        else:
+            color_counts[pixel] = 1
+    
+    background_color = max(color_counts.items(), key=lambda x: x[1])[0]
+    return background_color
+
+def remove_background_color(image: Image.Image, background_color: tuple) -> Image.Image:
+    """
+    指定された背景色を透過する
+    
+    Args:
+        image: PIL Imageオブジェクト
+        background_color: 背景色 (R, G, B)
+        
+    Returns:
+        背景が透過された画像
+    """
+    # 画像をRGBAモードに変換
+    image = image.convert("RGBA")
+    data = np.array(image)
+    
+    # 背景色との差を計算
+    color_diff = np.abs(data[:, :, :3] - background_color)
+    is_background = np.all(color_diff <= COLOR_THRESHOLD, axis=2)
+    
+    # 背景色と判断された部分を透過
+    data[:, :, 3] = np.where(is_background, 0, 255)
+    
+    return Image.fromarray(data)
+
 def process_image(input_data: bytes, mode: str) -> bytes:
     """
     画像を処理して背景を削除する
@@ -202,10 +265,12 @@ def process_image(input_data: bytes, mode: str) -> bytes:
     Returns:
         処理済み画像のバイトデータ
     """
-    if mode == "white":
-        # 白背景透過モード
+    if mode == "auto":
+        # 自動背景色検出モード
         image = Image.open(io.BytesIO(input_data))
-        processed_image = remove_white_background(image)
+        background_color = detect_background_color(image)
+        print(f"検出された背景色: RGB{background_color}")
+        processed_image = remove_background_color(image, background_color)
         output = io.BytesIO()
         processed_image.save(output, format="PNG")
         return output.getvalue()
