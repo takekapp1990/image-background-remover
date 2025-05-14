@@ -1,31 +1,46 @@
 #!/bin/bash
 
-# 基本的な実行例
-echo "=== 基本的な実行例 ==="
-python main.py my_prefix  # デフォルト設定で実行
+# 入力ディレクトリと出力ディレクトリの設定
+INPUT_DIR="input"
+OUTPUT_DIR="output"
 
-# プレフィックスのみ指定
-echo -e "\n=== プレフィックスのみ指定 ==="
-python main.py my_prefix  # プレフィックスを指定して実行
+# 出力ディレクトリが存在しない場合は作成
+mkdir -p "$OUTPUT_DIR"
 
-# 入力ディレクトリの指定
-echo -e "\n=== 入力ディレクトリの指定 ==="
-python main.py my_prefix --input-dir ~/Downloads/my_images/  # カスタム入力ディレクトリを指定
+# 基本的な使用方法
+echo "基本的な使用方法:"
+python main.py
 
-# 出力ディレクトリの指定
-echo -e "\n=== 出力ディレクトリの指定 ==="
-python main.py my_prefix --output-dir ~/Downloads/my_images/png  # カスタム出力ディレクトリを指定
+# プレフィックスを指定する場合
+echo -e "\nプレフィックスを指定する場合:"
+python main.py --prefix "processed_"
 
-# 背景削除モードの指定
-echo -e "\n=== 背景削除モードの指定 ==="
-python main.py my_prefix --mode rembg  # AIによる背景削除
-python main.py my_prefix --mode auto   # 背景色自動検出
+# 入力ディレクトリを指定する場合
+echo -e "\n入力ディレクトリを指定する場合:"
+python main.py --input-dir "my_images"
 
-# すべての設定をカスタマイズ
-echo -e "\n=== すべての設定をカスタマイズ ==="
-python main.py my_prefix --input-dir ~/Downloads/my_images/ --output-dir ~/Downloads/my_images/png --mode auto
+# 出力ディレクトリを指定する場合
+echo -e "\n出力ディレクトリを指定する場合:"
+python main.py --output-dir "processed"
 
-# 異なるモードでの比較
-echo -e "\n=== 異なるモードでの比較 ==="
-python main.py my_prefix --input-dir ~/Downloads/my_images/ --output-dir ~/Downloads/my_images/rembg --mode rembg
-python main.py my_prefix --input-dir ~/Downloads/my_images/ --output-dir ~/Downloads/my_images/auto --mode auto
+# 出力サイズを指定する場合
+echo -e "\n出力サイズを指定する場合:"
+python main.py --output-size 800 800
+
+# 異なるモードで処理を比較する場合
+echo -e "\n異なるモードで処理を比較する場合:"
+# rembgモード
+python main.py --mode rembg --prefix "rembg_"
+# autoモード
+python main.py --mode auto --prefix "auto_"
+
+# 異なる出力サイズで処理を比較する場合
+echo -e "\n異なる出力サイズで処理を比較する場合:"
+# 小さいサイズ
+python main.py --output-size 400 400 --prefix "small_"
+# 大きいサイズ
+python main.py --output-size 1200 1200 --prefix "large_"
+
+# カスタム設定を組み合わせる場合
+echo -e "\nカスタム設定を組み合わせる場合:"
+python main.py --input-dir "my_images" --output-dir "processed" --prefix "custom_" --output-size 800 800
